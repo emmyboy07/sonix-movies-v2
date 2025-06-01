@@ -60,7 +60,7 @@ export default async function handler(req, res) {
 
     // Return response
     return res.status(200).json({
-      heading: 'SONiX MOVIES',
+      heading: 'SONiX MOVIES LTD',
       success: true,
       qualities: cleanQualities
     });
