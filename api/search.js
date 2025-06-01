@@ -39,19 +39,21 @@ export default async function handler(req, res) {
       return res.status(404).json({ success: false, message: 'Movie info not found' });
     }
 
-    // 4. Get one download link per quality
+    // 4. Get 3rd download link per quality (fallback to 2nd)
     const qualities = infoData.data.qualities || [];
     const cleanQualities = await Promise.all(
       qualities.map(async (quality) => {
         const dlResp = await fetch(`https://clipsave-movies-api.onrender.com/v1/movies/download-links?link=${encodeURIComponent(quality.link)}`);
         const dlData = await dlResp.json();
-        const firstDownloadLink = dlData?.data?.[0]?.downloadLink || null;
+
+        // Use 3rd link, fallback to 2nd
+        const thirdOrSecondLink = dlData?.data?.[2]?.downloadLink || dlData?.data?.[1]?.downloadLink || null;
 
         return {
           quality: quality.quality,
           name: quality.name,
           size: quality.size,
-          downloadLink: firstDownloadLink
+          downloadLink: thirdOrSecondLink
         };
       })
     );
