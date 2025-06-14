@@ -1,9 +1,0 @@
-{
-  "version": 2,
-  "builds": [
-    {
-      "src": "api/get-movie-links.js",
-      "use": "@vercel/node"
-    }
-  ]
-}
