@@ -22,7 +22,8 @@ function cleanTitle(title) {
 export default async function handler(req, res) {
   const origin = req.headers.origin;
 
-  if (!allowedOrigins.includes(origin)) {
+  // ✅ Allow undefined origin (internal/proxy requests), else check if origin is allowed
+  if (origin && !allowedOrigins.includes(origin)) {
     return res.status(403).json({ success: false, message: 'Unauthorized request origin' });
   }
 
@@ -78,7 +79,6 @@ export default async function handler(req, res) {
       })
     );
 
-    // ✅ Return result with your branding
     return res.status(200).json({
       heading: 'SONiX MOVIES LTD',
       success: true,
