@@ -4,7 +4,7 @@ import fetch from 'node-fetch';
 const TMDB_API_KEY = '1e2d76e7c45818ed61645cb647981e5c';
 
 // ✅ Toggle your friend's access ON or OFF
-const isFriendEnabled = true;
+const isFriendEnabled = false;
 
 const allowedOrigins = [
   'https://sonix-movies.vercel.app',
