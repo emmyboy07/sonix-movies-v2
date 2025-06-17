@@ -3,7 +3,7 @@ import fetch from 'node-fetch';
 const TMDB_API_KEY = '1e2d76e7c45818ed61645cb647981e5c';
 
 // ✅ Toggle your friend's access ON/OFF
-const isFriendEnabled = false; // set false to block 02movie
+const isFriendEnabled = true; // set false to block 02movie
 
 function cleanTitle(title) {
   return title
