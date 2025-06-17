@@ -1,9 +1,7 @@
 import fetch from 'node-fetch';
 
 const TMDB_API_KEY = '1e2d76e7c45818ed61645cb647981e5c';
-
-// ✅ Toggle your friend's access ON/OFF
-const isFriendEnabled = false; // set false to block 02movie
+const isFriendEnabled = true;
 
 function cleanTitle(title) {
   return title
@@ -15,145 +13,102 @@ function cleanTitle(title) {
 
 export default async function handler(req, res) {
   const { tmdbId, header } = req.query;
-
-  if (!tmdbId) {
-    return res.status(400).json({ success: false, message: '"tmdbId" parameter is required' });
-  }
-
   const heading = header === '02movie' ? '02MOVIE' : 'SONiX MOVIES LTD';
 
-  // ❌ Block 02movie requests if switch is OFF
-  if (header === '02movie' && !isFriendEnabled) {
-    return res.status(403).json({
-      success: false,
-      heading,
-      message: 'Access denied: 02movie is currently disabled',
-    });
+  if (!tmdbId) {
+    return res.status(400).json({ success: false, heading, message: '"tmdbId" parameter is required' });
   }
 
-  // 📺 TV Show Logic
-  const isTvShow = tmdbId.includes('/');
-  if (isTvShow) {
+  // ❌ Restrict 02movie if disabled
+  if (header === '02movie' && !isFriendEnabled) {
+    return res.status(403).json({ success: false, heading, message: 'Access denied: 02movie is currently disabled' });
+  }
+
+  // 📺 TV Show Handler (e.g., 1399/2/5 = tvId/season/episode)
+  if (tmdbId.includes('/')) {
     const [tvId, season, episode] = tmdbId.split('/');
-
     try {
-      const tvResp = await fetch(`https://sonix-movies-v4-delta.vercel.app/cosmic/${tvId}/${season}/${episode}`);
-      const tvData = await tvResp.json();
-
-      const {
-        title,
-        success,
-        name,
-        streams = []
-      } = tvData;
-
-      const qualities = streams.map(stream => ({
-        quality: stream.quality || '',
-        name: stream.name || '',
-        size: stream.size || '',
-        links: {
-          first: stream.url || null,
-          second: null,
-          third: null
-        }
-      }));
+      const tvRes = await fetch(`https://sonix-movies-v4-delta.vercel.app/cosmic/${tvId}/${season}/${episode}`);
+      const tvData = await tvRes.json();
 
       return res.status(200).json({
         heading,
         success: true,
-        title,
-        name,
-        qualities
+        title: tvData.title,
+        name: tvData.name,
+        streams: tvData.streams || [],
       });
-
     } catch (err) {
-      console.error('TV Fetch Error:', err);
-      return res.status(500).json({
-        success: false,
-        heading,
-        message: 'TV episode fetch failed',
-        error: err.message
-      });
+      return res.status(500).json({ success: false, heading, message: 'TV fetch failed', error: err.message });
     }
   }
 
-  // 🎬 Movie Logic
+  // 🎬 Movie Handler
   try {
+    // Fetch from TMDb
     const tmdbResp = await fetch(`https://api.themoviedb.org/3/movie/${tmdbId}?api_key=${TMDB_API_KEY}`);
     const tmdbData = await tmdbResp.json();
     const imdbId = tmdbData.imdb_id;
-    const originalTitle = tmdbData.title;
+    const title = tmdbData.title;
 
-    if (!imdbId) {
-      return res.status(404).json({ success: false, heading, message: 'IMDb ID not found in TMDb data' });
+    if (!imdbId || !title) {
+      return res.status(404).json({ success: false, heading, message: 'Movie not found on TMDb' });
     }
 
-    const cleanedTitle = cleanTitle(originalTitle);
-    const sonixResp = await fetch(`https://sonix-movies-v1.vercel.app/api/search?query=${encodeURIComponent(cleanedTitle)}`);
-    const sonixData = await sonixResp.json();
-    const movies = sonixData?.results?.data || [];
-    const matchedMovie = movies.find((m) => m.id === imdbId);
+    // Search on Sonix
+    const cleanedTitle = cleanTitle(title);
+    const searchRes = await fetch(`https://sonix-movies-v1.vercel.app/api/search?query=${encodeURIComponent(cleanedTitle)}`);
+    const searchData = await searchRes.json();
+    const matched = searchData?.results?.data?.find((m) => m.id === imdbId);
 
-    if (matchedMovie) {
-      const infoResp = await fetch(`https://clipsave-movies-api.onrender.com/v1/movies/info?link=${encodeURIComponent(matchedMovie.link)}&id=${imdbId}`);
-      const infoData = await infoResp.json();
+    if (!matched) throw new Error('No match on Sonix');
 
-      if (infoData.success && infoData.data) {
-        const qualities = infoData.data.qualities || [];
+    // Fetch details from Clipsave
+    const infoRes = await fetch(`https://clipsave-movies-api.onrender.com/v1/movies/info?link=${encodeURIComponent(matched.link)}&id=${imdbId}`);
+    const infoData = await infoRes.json();
 
-        const cleanQualities = await Promise.all(
-          qualities.map(async (quality) => {
-            const dlResp = await fetch(`https://clipsave-movies-api.onrender.com/v1/movies/download-links?link=${encodeURIComponent(quality.link)}`);
-            const dlData = await dlResp.json();
+    if (!infoData.success || !infoData.data) throw new Error('No info on Clipsave');
 
-            return {
-              quality: quality.quality,
-              name: quality.name,
-              size: quality.size,
-              links: {
-                first: dlData?.data?.[0]?.downloadLink || null,
-                second: dlData?.data?.[1]?.downloadLink || null,
-                third: dlData?.data?.[2]?.downloadLink || null
-              }
-            };
-          })
-        );
+    // Get download links
+    const qualities = infoData.data.qualities || [];
+    const cleanQualities = await Promise.all(
+      qualities.map(async (q) => {
+        const dlRes = await fetch(`https://clipsave-movies-api.onrender.com/v1/movies/download-links?link=${encodeURIComponent(q.link)}`);
+        const dlData = await dlRes.json();
+        return {
+          quality: q.quality,
+          name: q.name,
+          size: q.size,
+          links: {
+            first: dlData?.data?.[0]?.downloadLink || null,
+            second: dlData?.data?.[1]?.downloadLink || null,
+            third: dlData?.data?.[2]?.downloadLink || null,
+          },
+        };
+      })
+    );
 
-        return res.status(200).json({
-          heading,
-          success: true,
-          qualities: cleanQualities
-        });
-      }
-    }
-
-    // 🔁 Fallback to sonix-movies-v4-delta
-    const fallbackResp = await fetch(`https://sonix-movies-v4-delta.vercel.app/cosmic/${tmdbId}`);
-    const fallbackData = await fallbackResp.json();
-
-    if (!fallbackData || !fallbackData.success || !fallbackData.streams) {
-      return res.status(404).json({ success: false, heading, message: 'Movie not found in any source' });
-    }
-
-    const fallbackQualities = fallbackData.streams.map(stream => ({
-      quality: stream.quality || '',
-      name: stream.name || '',
-      size: stream.size || '',
-      links: {
-        first: stream.url || null,
-        second: null,
-        third: null
-      }
-    }));
-
-    return res.status(200).json({
-      heading,
-      success: true,
-      qualities: fallbackQualities
-    });
-
+    return res.status(200).json({ heading, success: true, qualities: cleanQualities });
   } catch (err) {
-    console.error('Movie Fetch Error:', err);
-    return res.status(500).json({ success: false, heading, message: 'Server error', error: err.message });
+    // 🟡 Fallback to Cosmic API
+    try {
+      const fallbackRes = await fetch(`https://sonix-movies-v4-delta.vercel.app/cosmic/${tmdbId}`);
+      const fallbackData = await fallbackRes.json();
+
+      if (!fallbackData || !fallbackData.streams?.length) {
+        throw new Error('Cosmic fallback failed');
+      }
+
+      return res.status(200).json({
+        heading,
+        success: true,
+        name: fallbackData.name,
+        title: fallbackData.title || 'Untitled',
+        size: fallbackData.size || null,
+        streams: fallbackData.streams,
+      });
+    } catch (fallbackErr) {
+      return res.status(500).json({ success: false, heading, message: 'All sources failed', error: fallbackErr.message });
+    }
   }
 }
