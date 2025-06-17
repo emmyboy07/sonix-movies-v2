@@ -3,8 +3,9 @@ import fetch from 'node-fetch';
 const TMDB_API_KEY = '1e2d76e7c45818ed61645cb647981e5c';
 
 // ✅ Toggle your friend's access ON/OFF
-const isFriendEnabled = false; // set false to block 02movie
+const isFriendEnabled = false; // set to false to block 02movie
 
+// ✅ Clean movie title for search
 function cleanTitle(title) {
   return title
     .toLowerCase()
@@ -13,7 +14,7 @@ function cleanTitle(title) {
     .trim();
 }
 
-// ✅ Updated to support new subtitle structure
+// ✅ Return only one subtitle per language
 function singleSubtitlePerLang(subs = {}) {
   const filtered = [];
 
@@ -23,7 +24,7 @@ function singleSubtitlePerLang(subs = {}) {
       filtered.push({
         lang,
         name: firstSub.name,
-        url: firstSub.url
+        url: firstSub.url,
       });
     }
   }
@@ -31,6 +32,7 @@ function singleSubtitlePerLang(subs = {}) {
   return filtered;
 }
 
+// ✅ Main API Handler
 export default async function handler(req, res) {
   const { tmdbId, header } = req.query;
 
@@ -40,7 +42,7 @@ export default async function handler(req, res) {
 
   const heading = header === '02movie' ? '02MOVIE' : 'SONiX MOVIES LTD';
 
-  // ❌ Block 02movie requests if switch is OFF
+  // ❌ Deny access if 02movie is blocked
   if (header === '02movie' && !isFriendEnabled) {
     return res.status(403).json({
       success: false,
@@ -49,7 +51,6 @@ export default async function handler(req, res) {
     });
   }
 
-  // 📺 TV Show Logic
   const isTvShow = tmdbId.includes('/');
   if (isTvShow) {
     const [tvId, season, episode] = tmdbId.split('/');
@@ -72,16 +73,15 @@ export default async function handler(req, res) {
         title,
         name,
         streams,
-        subtitles: singleSubtitlePerLang(subtitles)
+        subtitles: singleSubtitlePerLang(subtitles),
       });
-
     } catch (err) {
       console.error('TV Fetch Error:', err);
       return res.status(500).json({
         success: false,
         heading,
         message: 'TV episode fetch failed',
-        error: err.message
+        error: err.message,
       });
     }
   }
@@ -129,8 +129,8 @@ export default async function handler(req, res) {
           links: {
             first: dlData?.data?.[0]?.downloadLink || null,
             second: dlData?.data?.[1]?.downloadLink || null,
-            third: dlData?.data?.[2]?.downloadLink || null
-          }
+            third: dlData?.data?.[2]?.downloadLink || null,
+          },
         };
       })
     );
@@ -139,11 +139,16 @@ export default async function handler(req, res) {
       heading,
       success: true,
       qualities: cleanQualities,
-      subtitles
+      subtitles,
     });
 
   } catch (err) {
     console.error('Movie Fetch Error:', err);
-    return res.status(500).json({ success: false, heading, message: 'Server error', error: err.message });
+    return res.status(500).json({
+      success: false,
+      heading,
+      message: 'Server error',
+      error: err.message,
+    });
   }
 }
