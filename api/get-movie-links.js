@@ -3,9 +3,8 @@ import fetch from 'node-fetch';
 const TMDB_API_KEY = '1e2d76e7c45818ed61645cb647981e5c';
 
 // ✅ Toggle your friend's access ON/OFF
-const isFriendEnabled = false; // set to false to block 02movie
+const isFriendEnabled = false; // set false to block 02movie
 
-// ✅ Clean movie title for search
 function cleanTitle(title) {
   return title
     .toLowerCase()
@@ -14,25 +13,6 @@ function cleanTitle(title) {
     .trim();
 }
 
-// ✅ Return only one subtitle per language
-function singleSubtitlePerLang(subs = {}) {
-  const filtered = [];
-
-  for (const lang in subs) {
-    if (Array.isArray(subs[lang]) && subs[lang].length > 0) {
-      const firstSub = subs[lang][0];
-      filtered.push({
-        lang,
-        name: firstSub.name,
-        url: firstSub.url,
-      });
-    }
-  }
-
-  return filtered;
-}
-
-// ✅ Main API Handler
 export default async function handler(req, res) {
   const { tmdbId, header } = req.query;
 
@@ -42,7 +22,7 @@ export default async function handler(req, res) {
 
   const heading = header === '02movie' ? '02MOVIE' : 'SONiX MOVIES LTD';
 
-  // ❌ Deny access if 02movie is blocked
+  // ❌ Block 02movie requests if switch is OFF
   if (header === '02movie' && !isFriendEnabled) {
     return res.status(403).json({
       success: false,
@@ -51,6 +31,7 @@ export default async function handler(req, res) {
     });
   }
 
+  // 📺 TV Show Logic
   const isTvShow = tmdbId.includes('/');
   if (isTvShow) {
     const [tvId, season, episode] = tmdbId.split('/');
@@ -63,8 +44,7 @@ export default async function handler(req, res) {
         title,
         success,
         name,
-        streams = [],
-        subtitles = {}
+        streams = []
       } = tvData;
 
       return res.status(200).json({
@@ -72,16 +52,16 @@ export default async function handler(req, res) {
         success: true,
         title,
         name,
-        streams,
-        subtitles: singleSubtitlePerLang(subtitles),
+        streams
       });
+
     } catch (err) {
       console.error('TV Fetch Error:', err);
       return res.status(500).json({
         success: false,
         heading,
         message: 'TV episode fetch failed',
-        error: err.message,
+        error: err.message
       });
     }
   }
@@ -115,7 +95,6 @@ export default async function handler(req, res) {
     }
 
     const qualities = infoData.data.qualities || [];
-    const subtitles = singleSubtitlePerLang(infoData.data.subtitles || {});
 
     const cleanQualities = await Promise.all(
       qualities.map(async (quality) => {
@@ -129,8 +108,8 @@ export default async function handler(req, res) {
           links: {
             first: dlData?.data?.[0]?.downloadLink || null,
             second: dlData?.data?.[1]?.downloadLink || null,
-            third: dlData?.data?.[2]?.downloadLink || null,
-          },
+            third: dlData?.data?.[2]?.downloadLink || null
+          }
         };
       })
     );
@@ -138,17 +117,11 @@ export default async function handler(req, res) {
     return res.status(200).json({
       heading,
       success: true,
-      qualities: cleanQualities,
-      subtitles,
+      qualities: cleanQualities
     });
 
   } catch (err) {
     console.error('Movie Fetch Error:', err);
-    return res.status(500).json({
-      success: false,
-      heading,
-      message: 'Server error',
-      error: err.message,
-    });
+    return res.status(500).json({ success: false, heading, message: 'Server error', error: err.message });
   }
 }
