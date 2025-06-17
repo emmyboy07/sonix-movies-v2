@@ -4,13 +4,16 @@ import fetch from 'node-fetch';
 const TMDB_API_KEY = '1e2d76e7c45818ed61645cb647981e5c';
 
 // ✅ Toggle your friend's access ON or OFF
-const isFriendEnabled = false;
+const isFriendEnabled = true;
 
-const allowedOrigins = [
+const allowedDomains = [
   'https://sonix-movies.vercel.app',
-  isFriendEnabled ? 'https://02movie.com' : null,
-  isFriendEnabled ? 'https://02movie-server.vercel.app' : null
-].filter(Boolean);
+  'https://sonix-movies-v2-beta.vercel.app',
+];
+
+if (isFriendEnabled) {
+  allowedDomains.push('https://02movie.com', 'https://02movie-server.vercel.app');
+}
 
 function cleanTitle(title) {
   return title
@@ -20,17 +23,14 @@ function cleanTitle(title) {
     .trim();
 }
 
-function isAllowedRequest(req) {
-  const origin = req.headers.origin || '';
-  const referer = req.headers.referer || '';
-
-  return allowedOrigins.some((domain) => 
-    origin.startsWith(domain) || referer.startsWith(domain)
-  );
-}
-
 export default async function handler(req, res) {
-  if (!isAllowedRequest(req)) {
+  const referer = req.headers.referer || '';
+  const origin = req.headers.origin || '';
+  const fromDomainAllowed = allowedDomains.some(domain =>
+    referer.startsWith(domain) || origin.startsWith(domain)
+  );
+
+  if (!fromDomainAllowed) {
     return res.status(403).json({ success: false, message: 'Unauthorized request origin' });
   }
 
@@ -50,7 +50,6 @@ export default async function handler(req, res) {
     }
 
     const cleanedTitle = cleanTitle(originalTitle);
-
     const sonixResp = await fetch(`https://sonix-movies-v1.vercel.app/api/search?query=${encodeURIComponent(cleanedTitle)}`);
     const sonixData = await sonixResp.json();
     const movies = sonixData?.results?.data || [];
