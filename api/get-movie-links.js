@@ -4,12 +4,19 @@ import fetch from 'node-fetch';
 const TMDB_API_KEY = '1e2d76e7c45818ed61645cb647981e5c';
 
 // ✅ Toggle your friend's access ON or OFF
-const isFriendEnabled = false;
+const isFriendEnabled = true;
+
+// Your main app and your friend's domains
+const myOrigin = 'https://sonix-movies.vercel.app';
+const friendOrigins = [
+  'https://02movie.com',
+  'https://02movie-server.vercel.app'
+];
 
 const allowedOrigins = [
-  'https://sonix-movies.vercel.app',
-  isFriendEnabled ? 'https://02movie.com' : null
-].filter(Boolean);
+  myOrigin,
+  ...(isFriendEnabled ? friendOrigins : [])
+];
 
 function cleanTitle(title) {
   return title
@@ -20,12 +27,12 @@ function cleanTitle(title) {
 }
 
 export default async function handler(req, res) {
-  const origin = req.headers.origin;
+    const origin = req.headers.origin;
 
-  // ✅ Allow undefined origin (internal/proxy requests), else check if origin is allowed
-  if (origin && !allowedOrigins.includes(origin)) {
+  if (!origin || !allowedOrigins.includes(origin)) {
     return res.status(403).json({ success: false, message: 'Unauthorized request origin' });
   }
+
 
   const { tmdbId } = req.query;
   if (!tmdbId) {
@@ -79,8 +86,14 @@ export default async function handler(req, res) {
       })
     );
 
+    // ✅ Branding logic based on origin
+    let heading = 'SONiX MOVIES LTD';
+    if (friendOrigins.includes(origin)) {
+      heading = '02MOVIE';
+    }
+
     return res.status(200).json({
-      heading: 'SONiX MOVIES LTD',
+      heading,
       success: true,
       qualities: cleanQualities
     });
