@@ -13,16 +13,18 @@ function cleanTitle(title) {
     .trim();
 }
 
-// ✅ Only 1 subtitle per language
-function singleSubtitlePerLang(subs = []) {
-  const seenLangs = new Set();
+// ✅ Updated to support new subtitle structure
+function singleSubtitlePerLang(subs = {}) {
   const filtered = [];
 
-  for (const sub of subs) {
-    const lang = sub.lang || 'Unknown';
-    if (!seenLangs.has(lang)) {
-      filtered.push({ lang, name: sub.name, url: sub.url });
-      seenLangs.add(lang);
+  for (const lang in subs) {
+    if (Array.isArray(subs[lang]) && subs[lang].length > 0) {
+      const firstSub = subs[lang][0];
+      filtered.push({
+        lang,
+        name: firstSub.name,
+        url: firstSub.url
+      });
     }
   }
 
@@ -61,7 +63,7 @@ export default async function handler(req, res) {
         success,
         name,
         streams = [],
-        subtitles = []
+        subtitles = {}
       } = tvData;
 
       return res.status(200).json({
@@ -113,7 +115,7 @@ export default async function handler(req, res) {
     }
 
     const qualities = infoData.data.qualities || [];
-    const subtitles = singleSubtitlePerLang(infoData.data.subtitles || []);
+    const subtitles = singleSubtitlePerLang(infoData.data.subtitles || {});
 
     const cleanQualities = await Promise.all(
       qualities.map(async (quality) => {
