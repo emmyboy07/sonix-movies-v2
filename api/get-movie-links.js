@@ -3,6 +3,14 @@ import fetch from 'node-fetch';
 
 const TMDB_API_KEY = '1e2d76e7c45818ed61645cb647981e5c';
 
+// ✅ Toggle your friend's access ON or OFF
+const isFriendEnabled = true;
+
+const allowedOrigins = [
+  'https://sonix-movies.vercel.app',
+  isFriendEnabled ? 'https://02movie.com' : null
+].filter(Boolean);
+
 function cleanTitle(title) {
   return title
     .toLowerCase()
@@ -11,16 +19,14 @@ function cleanTitle(title) {
     .trim();
 }
 
-// 🔒 Master control switch
-const IS_ENABLED = true; // change to false to disable access
-
 export default async function handler(req, res) {
-  if (!IS_ENABLED) {
-    return res.status(403).json({ success: false, message: 'Access disabled by owner' });
+  const origin = req.headers.origin;
+
+  if (!allowedOrigins.includes(origin)) {
+    return res.status(403).json({ success: false, message: 'Unauthorized request origin' });
   }
 
-  const { tmdbId, header } = req.query;
-
+  const { tmdbId } = req.query;
   if (!tmdbId) {
     return res.status(400).json({ success: false, message: '"tmdbId" parameter is required' });
   }
@@ -36,6 +42,7 @@ export default async function handler(req, res) {
     }
 
     const cleanedTitle = cleanTitle(originalTitle);
+
     const sonixResp = await fetch(`https://sonix-movies-v1.vercel.app/api/search?query=${encodeURIComponent(cleanedTitle)}`);
     const sonixData = await sonixResp.json();
     const movies = sonixData?.results?.data || [];
@@ -71,8 +78,9 @@ export default async function handler(req, res) {
       })
     );
 
+    // ✅ Return result with your branding
     return res.status(200).json({
-      heading: header || 'SONiX MOVIES LTD', // Default if not provided
+      heading: 'SONiX MOVIES LTD',
       success: true,
       qualities: cleanQualities
     });
