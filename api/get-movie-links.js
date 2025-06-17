@@ -3,10 +3,8 @@ import fetch from 'node-fetch';
 
 const TMDB_API_KEY = '1e2d76e7c45818ed61645cb647981e5c';
 
-const friendDomains = [
-  'https://02movie.com',
-  'https://02movie-server.vercel.app'
-];
+// ✅ Toggle your friend's access ON/OFF
+const isFriendEnabled = true; // set false to block 02movie
 
 function cleanTitle(title) {
   return title
@@ -17,17 +15,21 @@ function cleanTitle(title) {
 }
 
 export default async function handler(req, res) {
-  const referer = req.headers.referer || '';
-  const origin = req.headers.origin || '';
+  const { tmdbId, header } = req.query;
 
-  // Detect if request is from your friend’s site
-  const isFriendRequest = friendDomains.some(domain =>
-    referer.startsWith(domain) || origin.startsWith(domain)
-  );
-
-  const { tmdbId } = req.query;
   if (!tmdbId) {
     return res.status(400).json({ success: false, message: '"tmdbId" parameter is required' });
+  }
+
+  const heading = header === '02movie' ? '02MOVIE' : 'SONiX MOVIES LTD';
+
+  // ❌ Block 02movie requests if switch is OFF
+  if (header === '02movie' && !isFriendEnabled) {
+    return res.status(403).json({
+      success: false,
+      heading,
+      message: 'Access denied: 02movie is currently disabled',
+    });
   }
 
   try {
@@ -37,7 +39,7 @@ export default async function handler(req, res) {
     const originalTitle = tmdbData.title;
 
     if (!imdbId) {
-      return res.status(404).json({ success: false, message: 'IMDb ID not found in TMDb data' });
+      return res.status(404).json({ success: false, heading, message: 'IMDb ID not found in TMDb data' });
     }
 
     const cleanedTitle = cleanTitle(originalTitle);
@@ -48,14 +50,14 @@ export default async function handler(req, res) {
     const matchedMovie = movies.find((m) => m.id === imdbId);
 
     if (!matchedMovie) {
-      return res.status(404).json({ success: false, message: 'No matching movie found on Sonix API' });
+      return res.status(404).json({ success: false, heading, message: 'No matching movie found on Sonix API' });
     }
 
     const infoResp = await fetch(`https://clipsave-movies-api.onrender.com/v1/movies/info?link=${encodeURIComponent(matchedMovie.link)}&id=${imdbId}`);
     const infoData = await infoResp.json();
 
     if (!infoData.success || !infoData.data) {
-      return res.status(404).json({ success: false, message: 'Movie info not found on Clipsave API' });
+      return res.status(404).json({ success: false, heading, message: 'Movie info not found on Clipsave API' });
     }
 
     const qualities = infoData.data.qualities || [];
@@ -78,13 +80,13 @@ export default async function handler(req, res) {
     );
 
     return res.status(200).json({
-      heading: isFriendRequest ? '02MOVIE' : 'SONiX MOVIES LTD',
+      heading,
       success: true,
       qualities: cleanQualities
     });
 
   } catch (err) {
     console.error('Error:', err);
-    return res.status(500).json({ success: false, message: 'Server error', error: err.message });
+    return res.status(500).json({ success: false, heading, message: 'Server error', error: err.message });
   }
 }
