@@ -3,6 +3,9 @@ import fetch from 'node-fetch';
 
 const TMDB_API_KEY = '1e2d76e7c45818ed61645cb647981e5c';
 
+// ✅ TOGGLE ACCESS HERE
+const allowFriend = true; // <<== Change to false to disable his access
+
 function cleanTitle(title) {
   return title
     .toLowerCase()
@@ -12,6 +15,11 @@ function cleanTitle(title) {
 }
 
 export default async function handler(req, res) {
+  // 🛑 Block your friend's access if toggle is OFF
+  if (!allowFriend && req.headers['x-sonix-client'] === 'friend') {
+    return res.status(403).json({ success: false, message: 'Access denied by SONiX Movies' });
+  }
+
   const { tmdbId } = req.query;
 
   if (!tmdbId) {
