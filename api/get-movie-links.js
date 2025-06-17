@@ -32,7 +32,7 @@ export default async function handler(req, res) {
     });
   }
 
-  // TV Show check
+  // 📺 TV Show logic
   const isTvShow = tmdbId.includes('/');
   if (isTvShow) {
     const [tvId, season, episode] = tmdbId.split('/');
@@ -41,22 +41,19 @@ export default async function handler(req, res) {
       const tvResp = await fetch(`https://sonix-movies-v4-delta.vercel.app/cosmic/${tvId}/${season}/${episode}`);
       const tvData = await tvResp.json();
 
-      if (!tvData.success || !tvData.data) {
-        return res.status(404).json({ success: false, heading, message: 'TV episode not found on Sonix API' });
-      }
-
-      return res.status(200).json({
-        heading,
-        success: true,
-        ...tvData.data
-      });
+      // ✅ Return raw response from Sonix TV API, no filtering
+      return res.status(200).json(tvData);
     } catch (err) {
       console.error('TV Fetch Error:', err);
-      return res.status(500).json({ success: false, heading, message: 'TV episode fetch failed', error: err.message });
+      return res.status(500).json({
+        success: false,
+        message: 'TV episode fetch failed',
+        error: err.message
+      });
     }
   }
 
-  // Movie logic
+  // 🎬 Movie logic
   try {
     const tmdbResp = await fetch(`https://api.themoviedb.org/3/movie/${tmdbId}?api_key=${TMDB_API_KEY}`);
     const tmdbData = await tmdbResp.json();
@@ -111,7 +108,7 @@ export default async function handler(req, res) {
     });
 
   } catch (err) {
-    console.error('Error:', err);
+    console.error('Movie Fetch Error:', err);
     return res.status(500).json({ success: false, heading, message: 'Server error', error: err.message });
   }
 }
