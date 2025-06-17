@@ -1,4 +1,3 @@
-// api/get-movie-links.js
 import fetch from 'node-fetch';
 
 const TMDB_API_KEY = '1e2d76e7c45818ed61645cb647981e5c';
@@ -14,14 +13,20 @@ function cleanTitle(title) {
     .trim();
 }
 
-function groupSubtitles(subs = []) {
-  const grouped = {};
+// ✅ Only 1 subtitle per language
+function singleSubtitlePerLang(subs = []) {
+  const seenLangs = new Set();
+  const filtered = [];
+
   for (const sub of subs) {
     const lang = sub.lang || 'Unknown';
-    if (!grouped[lang]) grouped[lang] = [];
-    grouped[lang].push({ name: sub.name, url: sub.url });
+    if (!seenLangs.has(lang)) {
+      filtered.push({ lang, name: sub.name, url: sub.url });
+      seenLangs.add(lang);
+    }
   }
-  return grouped;
+
+  return filtered;
 }
 
 export default async function handler(req, res) {
@@ -65,7 +70,7 @@ export default async function handler(req, res) {
         title,
         name,
         streams,
-        subtitles: groupSubtitles(subtitles)
+        subtitles: singleSubtitlePerLang(subtitles)
       });
 
     } catch (err) {
@@ -108,6 +113,8 @@ export default async function handler(req, res) {
     }
 
     const qualities = infoData.data.qualities || [];
+    const subtitles = singleSubtitlePerLang(infoData.data.subtitles || []);
+
     const cleanQualities = await Promise.all(
       qualities.map(async (quality) => {
         const dlResp = await fetch(`https://clipsave-movies-api.onrender.com/v1/movies/download-links?link=${encodeURIComponent(quality.link)}`);
@@ -129,7 +136,8 @@ export default async function handler(req, res) {
     return res.status(200).json({
       heading,
       success: true,
-      qualities: cleanQualities
+      qualities: cleanQualities,
+      subtitles
     });
 
   } catch (err) {
