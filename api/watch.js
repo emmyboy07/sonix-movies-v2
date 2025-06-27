@@ -36,32 +36,49 @@ export default async function handler(req, res) {
     const encodedId = encodeURIComponent(id);
     const destination = `https://tom.autoembed.cc/api/getVideoSource?type=${type}&id=${encodedId}`;
     const passthroughUrl = `https://pass-through.arlen.icu/?destination=${encodeURIComponent(destination)}`;
-    const response = await axios.get(passthroughUrl, {
+
+    // Fetch video source
+    const response = await fetch(passthroughUrl, {
       headers: {
         'x-origin': 'https://tom.autoembed.cc',
         'x-referer': 'https://tom.autoembed.cc'
       }
     });
 
-    videoUrl = response.data.videoSource;
+    if (!response.ok) {
+      console.error(`[WATCH] Passthrough fetch failed: ${response.status}`);
+      return res.status(502).json({
+        success: false,
+        heading,
+        message: 'Failed to fetch video source (passthrough error).'
+      });
+    }
+
+    const data = await response.json();
+    videoUrl = data.videoSource;
 
     if (videoUrl && videoUrl.endsWith('.m3u8')) {
       videoSources = [{ url: videoUrl, label: 'Auto', type: 'hls' }];
     } else {
+      console.error(`[WATCH] No HLS video source found. Data:`, data);
       return res.status(404).json({
         success: false,
         heading,
-        message: 'No HLS (.m3u8) video source found.'
+        message: 'No HLS (.m3u8) video source found.',
+        data
       });
     }
 
     // 🎬 Handle TMDB metadata
     if (type === 'movie') {
-      const tmdbRes = await axios.get(
+      const tmdbRes = await fetch(
         `https://api.themoviedb.org/3/movie/${id}?api_key=${TMDB_API_KEY}&language=en-US`
       );
-      imdbId = tmdbRes.data.imdb_id;
-      title = tmdbRes.data.title || tmdbRes.data.name || 'Untitled';
+      if (tmdbRes.ok) {
+        const tmdbData = await tmdbRes.json();
+        imdbId = tmdbData.imdb_id;
+        title = tmdbData.title || tmdbData.name || 'Untitled';
+      }
     } else if (type === 'tv') {
       const parts = id.split('/');
       const seriesId = parts[0];
@@ -72,24 +89,34 @@ export default async function handler(req, res) {
         episodeNumber = parts[2];
       }
 
-      const externalRes = await axios.get(
+      const externalRes = await fetch(
         `https://api.themoviedb.org/3/tv/${seriesId}/external_ids?api_key=${TMDB_API_KEY}`
       );
-      imdbId = externalRes.data.imdb_id;
+      if (externalRes.ok) {
+        const externalData = await externalRes.json();
+        imdbId = externalData.imdb_id;
+      }
 
       if (seasonNumber && episodeNumber) {
-        const epRes = await axios.get(
+        const epRes = await fetch(
           `https://api.themoviedb.org/3/tv/${seriesId}/season/${seasonNumber}/episode/${episodeNumber}?api_key=${TMDB_API_KEY}&language=en-US`
         );
-        const showRes = await axios.get(
+        const showRes = await fetch(
           `https://api.themoviedb.org/3/tv/${seriesId}?api_key=${TMDB_API_KEY}&language=en-US`
         );
-        title = `${showRes.data.name || 'Series'} - S${seasonNumber}E${episodeNumber}: ${epRes.data.name || 'Episode'}`;
+        if (epRes.ok && showRes.ok) {
+          const epData = await epRes.json();
+          const showData = await showRes.json();
+          title = `${showData.name || 'Series'} - S${seasonNumber}E${episodeNumber}: ${epData.name || 'Episode'}`;
+        }
       } else {
-        const showRes = await axios.get(
+        const showRes = await fetch(
           `https://api.themoviedb.org/3/tv/${seriesId}?api_key=${TMDB_API_KEY}&language=en-US`
         );
-        title = showRes.data.name || 'Untitled';
+        if (showRes.ok) {
+          const showData = await showRes.json();
+          title = showData.name || 'Untitled';
+        }
       }
     }
 
