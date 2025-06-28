@@ -1,9 +1,9 @@
 {
   "name": "sonix-search-api",
   "version": "1.0.0",
-  "type": "module",
   "dependencies": {
-    "cheerio": "^1.0.0-rc.12"
+    "axios": "^1.6.8",
+    "cheerio": "^1.0.0-rc.12",
     "express": "^5.1.0",
     "node-fetch": "^3.3.2"
   }
