@@ -1,3 +1,4 @@
+// ✅ Import fetch (no need in Next.js ≥12 as it's built-in, but kept for compatibility)
 import fetch from 'node-fetch';
 
 const TMDB_API_KEY = '1e2d76e7c45818ed61645cb647981e5c';
@@ -15,7 +16,7 @@ export default async function handler(req, res) {
     return res.status(403).json({
       success: false,
       heading,
-      message: 'Access denied: 02movie is currently disabled'
+      message: 'Access denied: 02movie is currently disabled',
     });
   }
 
@@ -23,7 +24,7 @@ export default async function handler(req, res) {
     return res.status(400).json({
       success: false,
       heading,
-      message: '"type" and "id" parameters are required'
+      message: '"type" and "id" parameters are required',
     });
   }
 
@@ -37,12 +38,11 @@ export default async function handler(req, res) {
     const destination = `https://tom.autoembed.cc/api/getVideoSource?type=${type}&id=${encodedId}`;
     const passthroughUrl = `https://pass-through.arlen.icu/?destination=${encodeURIComponent(destination)}`;
 
-    // Fetch video source
     const response = await fetch(passthroughUrl, {
       headers: {
         'x-origin': 'https://tom.autoembed.cc',
-        'x-referer': 'https://tom.autoembed.cc'
-      }
+        'x-referer': 'https://tom.autoembed.cc',
+      },
     });
 
     if (!response.ok) {
@@ -50,7 +50,7 @@ export default async function handler(req, res) {
       return res.status(502).json({
         success: false,
         heading,
-        message: 'Failed to fetch video source (passthrough error).'
+        message: 'Failed to fetch video source (passthrough error).',
       });
     }
 
@@ -60,16 +60,16 @@ export default async function handler(req, res) {
     if (videoUrl && videoUrl.endsWith('.m3u8')) {
       videoSources = [{ url: videoUrl, label: 'Auto', type: 'hls' }];
     } else {
-      console.error(`[WATCH] No HLS video source found. Data:`, data);
+      console.warn(`[WATCH] No valid HLS source:`, data);
       return res.status(404).json({
         success: false,
         heading,
         message: 'No HLS (.m3u8) video source found.',
-        data
+        data,
       });
     }
 
-    // 🎬 Handle TMDB metadata
+    // 🧠 Get TMDB metadata
     if (type === 'movie') {
       const tmdbRes = await fetch(
         `https://api.themoviedb.org/3/movie/${id}?api_key=${TMDB_API_KEY}&language=en-US`
@@ -82,13 +82,10 @@ export default async function handler(req, res) {
     } else if (type === 'tv') {
       const parts = id.split('/');
       const seriesId = parts[0];
-      let seasonNumber, episodeNumber;
+      const seasonNumber = parts[1];
+      const episodeNumber = parts[2];
 
-      if (parts.length === 3) {
-        seasonNumber = parts[1];
-        episodeNumber = parts[2];
-      }
-
+      // Get IMDb ID
       const externalRes = await fetch(
         `https://api.themoviedb.org/3/tv/${seriesId}/external_ids?api_key=${TMDB_API_KEY}`
       );
@@ -97,6 +94,7 @@ export default async function handler(req, res) {
         imdbId = externalData.imdb_id;
       }
 
+      // Build title
       if (seasonNumber && episodeNumber) {
         const epRes = await fetch(
           `https://api.themoviedb.org/3/tv/${seriesId}/season/${seasonNumber}/episode/${episodeNumber}?api_key=${TMDB_API_KEY}&language=en-US`
@@ -120,7 +118,7 @@ export default async function handler(req, res) {
       }
     }
 
-    console.log(`🎬 Playing: ${title}`);
+    console.log(`🎬 Now playing: ${title}`);
     console.log(`🔗 Video URL: ${videoUrl}`);
 
     return res.status(200).json({
@@ -130,7 +128,7 @@ export default async function handler(req, res) {
       imdbId,
       tmdbId: id,
       videoUrl,
-      videoSources
+      videoSources,
     });
 
   } catch (err) {
@@ -139,7 +137,7 @@ export default async function handler(req, res) {
       success: false,
       heading,
       message: 'Failed to fetch video source.',
-      error: err.message
+      error: err.message,
     });
   }
 }
