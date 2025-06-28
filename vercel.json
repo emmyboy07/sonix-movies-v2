@@ -12,6 +12,10 @@
       "dest": "/api/watch.js"
     },
     {
+      "src": "^/api/subtitle$",
+      "dest": "/api/subtitle.js"
+    },
+    {
       "src": "^/api/(.*)$",
       "dest": "/api/$1.js"
     },
