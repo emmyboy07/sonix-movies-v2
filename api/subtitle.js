@@ -1,5 +1,5 @@
-const axios = require('axios');
-const cheerio = require('cheerio');
+import axios from 'axios';
+import cheerio from 'cheerio';
 
 const BASE_URL = 'https://yifysubtitles.ch';
 const TMDB_API_KEY = '1e2d76e7c45818ed61645cb647981e5c';
@@ -92,8 +92,8 @@ async function getSubtitlesFromImdb(imdbId) {
   }
 }
 
-// 🔁 Export handler function for Vercel
-module.exports = async (req, res) => {
+// 🔁 Export handler for Vercel
+export default async function handler(req, res) {
   const { tmdbId, header } = req.query;
   const heading = header === '02movie' ? '02MOVIE' : 'SONiX MOVIES LTD';
 
@@ -121,4 +121,4 @@ module.exports = async (req, res) => {
     subtitleCount: subtitles.length,
     subtitles,
   });
-};
+}
