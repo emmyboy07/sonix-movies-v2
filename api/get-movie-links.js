@@ -53,6 +53,11 @@ export default async function handler(req, res) {
       return res.status(404).json({ success: false, heading, message: 'Movie not found on TMDb' });
     }
 
+    // Fire subtitle request early
+    const subtitlePromise = fetch(`https://sonix-subtitle.vercel.app/api/subtitle?tmdbId=${tmdbId}`)
+      .then((r) => r.json())
+      .catch(() => null); // subtitle fetch must not block
+
     const cleanedTitle = cleanTitle(title);
     const searchRes = await fetch(`https://sonix-movies-v1.vercel.app/api/search?query=${encodeURIComponent(cleanedTitle)}`);
     const searchData = await searchRes.json();
@@ -83,7 +88,14 @@ export default async function handler(req, res) {
       })
     );
 
-    return res.status(200).json({ heading, success: true, qualities: cleanQualities });
+    const subtitles = await subtitlePromise; // Wait for subtitle fetch before returning
+
+    return res.status(200).json({
+      heading,
+      success: true,
+      qualities: cleanQualities,
+      subtitles: subtitles || null,
+    });
   } catch (err) {
     try {
       const fallbackRes = await fetch(`https://sonix-movies-v4-delta.vercel.app/cosmic/${tmdbId}`);
