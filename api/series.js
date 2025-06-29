@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const TMDB_API_KEY = '1e2d76e7c45818ed61645cb647981e5c';
-const isFriendEnabled = false;  // <-- Your friend access toggle
+const isFriendEnabled = true;  // <-- Your friend access toggle
 
 // Normalize title: lowercase, alphanumerics only
 function cleanTitle(title) {
