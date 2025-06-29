@@ -1,6 +1,6 @@
 import axios from 'axios';
 import https from 'https';
-import cheerio from 'cheerio';
+import * as cheerio from 'cheerio';
 
 const TMDB_API_KEY = '1e2d76e7c45818ed61645cb647981e5c';
 
