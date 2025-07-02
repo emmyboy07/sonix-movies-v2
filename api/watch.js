@@ -2,7 +2,7 @@
 import fetch from 'node-fetch';
 
 const TMDB_API_KEY = '1e2d76e7c45818ed61645cb647981e5c';
-const isFriendEnabled = false;
+const isFriendEnabled = true;
 
 export default async function handler(req, res) {
   const { type, id, header } = req.query;
